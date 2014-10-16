@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="./assets/css/tests.css">
+    <link href="./assets/css/bootstrap-combined.no-icons.min.css" rel="stylesheet">
+    <script src="./assets/js/jquery-2.1.1.js"></script>
+    <script src="./assets/js/d3.min.js" charset="utf-8"></script>
+    <script src="./assets/js/epoch.0.5.2.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="./assets/css/epoch.0.5.2.min.css">
+</head>
+<body>
+<h1>Enrichment App 2.0 beta</h1>
+<!--WebSocket status : <span id="message"></span>-->
+
+<!--<div id="readers" class="epoch" style="height: 200px"></div>-->
+<div id="writers" class="epoch category20" style="height: 200px"></div>
+<div id="parsers" class="epoch category20" style="height: 600px"></div>
+
+<script>
+
+
+    var data;
+    var writers_chart;
+    var parsers_chart;
+    $.getJSON("http://ndeusemssvarc10:8888/api/history?proc=writer&sum=true", function (json) {
+        data = json;
+        writers_chart = $('#writers').epoch({
+            type: 'time.area',
+            data: data,
+            axes: ['left', 'bottom', 'right'],
+            windowSize: 300,
+            historySize: 300,
+            ticks: { time: 60, right: 5, left: 5 }
+        });
+
+    });
+
+    $.getJSON("http://ndeusemssvarc10:8888/api/history?proc=parser", function (json) {
+        data = json;
+        parsers_chart = $('#parsers').epoch({
+            type: 'time.area',
+            data: data,
+            axes: ['left', 'bottom', 'right'],
+            windowSize: 300,
+            historySize: 300,
+            ticks: { time: 60, right: 5, left: 5 }
+        });
+
+    });
+
+
+    //    var parsers_chart = $('#parsers').epoch({
+    //        type: 'time.area',
+    //        windowSize: 300,
+    //        //    historySize: 240,
+    //        data: parser_data.history(),
+    //        axes: ['left', 'bottom', 'right']
+    //    });
+
+    var $message = $('#message');
+    var ws = new WebSocket('ws://214.28.240.151:8888/ws');
+
+    ws.onopen = function () {
+        $message.attr("class", 'label label-success');
+        $message.text('open');
+    };
+
+    ws.onclose = function () {
+        $message.attr("class", 'label label-important');
+        $message.text('closed');
+    };
+    ws.onerror = function () {
+        $message.attr("class", 'label label-warning');
+        $message.text('error occurred');
+    };
+
+    ws.onmessage = function (event) {
+        var data = JSON.parse(event.data);
+        console.log(data);
+
+
+        var procs_to_sum = ["reader", "writer"];
+        var procs_to_area = ["parser"]
+        var jsonObject_sum = {};
+        var jsonObject_area = {};
+        var jsonObject_array = [];
+
+        for (var i = 0; i < procs_to_sum.length; i++) {
+            var sum = 0;
+            var proc_name = procs_to_sum[i];
+
+            for (var x = 0; x < data.length; x++) {
+                var obj = data[x];
+                if (obj.label.indexOf(proc_name) != -1) {
+                    sum += obj.y;
+                    var time = obj.time;
+                }
+            }
+
+            jsonObject_sum[proc_name] = [
+                {
+                    "label": proc_name,
+                    "time": time,
+                    "y": sum
+                }
+            ];
+
+        }
+
+        for (var i = 0; i < procs_to_area.length; i++) {
+            var proc_name = procs_to_area[i];
+
+            for (var x = 0; x < data.length; x++) {
+                var obj = data[x];
+                if (obj.label.indexOf(proc_name) != -1) {
+                    jsonObject_array.push({
+                        "label": obj.label,
+                        "time": obj.time,
+                        "y": obj.y
+                    });
+
+                }
+            }
+
+
+        }
+
+
+        writers_chart.push(jsonObject_sum.writer);
+//        readers_chart.push(jsonObject_sum.reader);
+        parsers_chart.push(jsonObject_array);
+//        console.log(jsonObject_sum.writer);
+//        console.log(jsonObject_array);
+    };
+
+
+</script>
+
+
+</body>
+</html>
